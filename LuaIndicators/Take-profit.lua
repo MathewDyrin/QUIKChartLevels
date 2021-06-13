@@ -3,14 +3,14 @@ JSON = (loadfile "LuaIndicators\\JSON.lua")()
 
 Settings=
 {
-    Name = "Line1",
+    Name = "Take-profit",
     period = 5, 
     line = {
              {
-                Name = "Line1", 
-                Color = RGB(255, 255, 0),
-                Type = TYPE_LINE,
-                Width = 2
+                Name = "Take-profit", 
+                Color = RGB(38, 166, 154),
+                Type = TYPE_DASHDOT,
+                Width = 1
              }
           }
 }
@@ -23,7 +23,7 @@ function Init()
 end
 
 function OnCalculate(index)
-	local FilePath = APPDATA .. "\\QuikLines\\storage\\line1.json"
+	local FilePath = APPDATA .. "\\QuikLines\\storage\\line4.json"
 	local FileReader = io.open(FilePath, "r")
 	local Content = FileReader:read("*all")
 	FileReader:close()
@@ -32,6 +32,6 @@ function OnCalculate(index)
 	if Data[ticker] then
 		return Data[ticker]
 	else
-		return 0
+		return nil
 	end
 end

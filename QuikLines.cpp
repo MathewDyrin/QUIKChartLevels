@@ -7,6 +7,7 @@
 #include <windows.h>
 #include <shlobj.h>
 #include "boost/filesystem.hpp"
+#include "boost/algorithm/string/replace.hpp"
 
 using json = nlohmann::json;
 
@@ -238,6 +239,112 @@ void Delete()
     std::cout << "Успешно!\n\n" << std::endl;
 }
 
+void Batch() 
+{
+    std::string filePath;
+    std::cout << "Введите путь к файлу: напрмер C:\\Users\\DefaultUser\\Desktop\\example.txt" << std::endl;
+    ClearCin();
+    std::getline(std::cin, filePath);
+
+    std::ifstream file(filePath);
+    bool has_data = false;
+    json fileData;
+
+
+    if (file.is_open())
+    {
+        if (file.peek() != EOF)
+        {
+            file >> fileData;
+        }
+    }
+
+    int lines = 4;
+    std::vector<std::string> keys{ "Level", "Entry", "Stop", "Take-profit" };
+
+    for (int i = 0; i < lines; i++)
+    {
+        std::string filePath = PROGRAM_DATA_PATH + "\\line" + std::to_string(i + 1) + ".json";
+        std::ifstream file(filePath);
+        bool has_data = false;
+        json tempJson;
+
+
+        if (file.is_open())
+        {
+            if (file.peek() != EOF)
+            {
+                file >> tempJson;
+                has_data = true;
+            }
+        };
+
+        for (auto elem : fileData) 
+        {
+            if (has_data && tempJson.find(elem["Ticker"]) != tempJson.end())
+            {
+                std::string key(elem["Ticker"]); 
+                tempJson.erase(key); 
+            }
+
+            auto val = std::move(elem[keys[i]]);
+            std::string str(val);
+            std::string output = boost::replace_all_copy(str, ".", ",");
+          
+            double value = std::stod(output);
+            std::string key = elem["Ticker"]; 
+            tempJson[key] = value;
+        }
+
+        std::ofstream outputFile(filePath);
+        outputFile << std::setw(4) << tempJson << std::endl;
+    }
+
+    std::cout << "Успешно!\n\n" << std::endl;
+}
+
+void Clear() 
+{
+    std::string result; 
+    
+    std::cout << "Выполнить очистку хранилища? (Введите YES и нажмите Enter): ";
+    ClearCin();
+    std::cin >> result; 
+
+    if (result == "YES") 
+    {
+        int lines = 4;
+
+        for (int i = 0; i < lines; i++)
+        {
+            std::string filePath = PROGRAM_DATA_PATH + "\\line" + std::to_string(i + 1) + ".json";
+            std::ifstream file(filePath);
+            json tempJson;
+
+
+            if (file.is_open())
+            {
+                if (file.peek() != EOF)
+                {
+                    file >> tempJson;
+
+                    tempJson.clear(); 
+
+                    std::ofstream outputFile(filePath);
+                    outputFile << std::setw(4) << tempJson << std::endl;
+                }
+            } 
+        }
+
+        std::cout << "Успешно!\n\n" << std::endl;
+    }
+
+    else 
+    {
+        std::cout << "Вы отменили очистку хранилища.\n\n" << std::endl;
+    }
+}
+
 int main()
 {
     setlocale(LC_ALL, "ru");
@@ -246,14 +353,16 @@ int main()
     while (true) 
     {
         const std::string addMethod= "ADD"; 
-        const std::string deleteMethod = "DELETE"; 
+        const std::string deleteMethod = "DELETE";
+        const std::string batchMethod = "BATCH"; 
+        const std::string clearMethod = "CLEAR"; 
         const std::string quitMethod = "QUIT"; 
 
         bool outter = false; 
 
         std::string args; 
         std::vector<std::string> argsVector; 
-        std::cout << "Выберите метод: ADD, DELETE, QUIT.\nВведите название метода и нажмите ENTER" << std::endl; 
+        std::cout << "Выберите метод: ADD, BATCH, DELETE, CLEAR.\nВведите название метода и нажмите ENTER или введите QUIT и нажмите ENTER, чтобы выйти." << std::endl; 
         ClearCin(); 
         std::getline(std::cin, args);
         size_t size = split(args, argsVector, ' ');
@@ -279,6 +388,20 @@ int main()
             {
                 std::cout << "\nВы выбрали метод DELETE" << std::endl;
                 Delete();
+                outter = true;
+            }
+
+            if (method == batchMethod)
+            {
+                std::cout << "\nВы выбрали метод BATCH" << std::endl;
+                Batch();
+                outter = true;
+            }
+
+            if (method == clearMethod) 
+            {
+                std::cout << "\nВы выбрали метод CLEAR" << std::endl;
+                Clear();
                 outter = true;
             }
 

@@ -3,14 +3,14 @@ JSON = (loadfile "LuaIndicators\\JSON.lua")()
 
 Settings=
 {
-    Name = "Line2",
+    Name = "Entry",
     period = 5, 
     line = {
              {
-                Name = "Line2", 
-                Color = RGB(255, 255, 0),
-                Type = TYPE_LINE,
-                Width = 2
+                Name = "Entry", 
+                Color = RGB(23, 118, 210),
+                Type = TYPE_DASHDOT,
+                Width = 1
              }
           }
 }
@@ -32,6 +32,6 @@ function OnCalculate(index)
 	if Data[ticker] then
 		return Data[ticker]
 	else
-		return 0
+		return nil
 	end
 end
