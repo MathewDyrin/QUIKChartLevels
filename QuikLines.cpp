@@ -5,9 +5,13 @@
 #include <map>
 #include <vector>
 #include <windows.h>
+#include <atlimage.h>
+#include <sstream>
+#include <codecvt>
 #include <shlobj.h>
 #include "boost/filesystem.hpp"
 #include "boost/algorithm/string/replace.hpp"
+#include "boost/locale.hpp"
 
 using json = nlohmann::json;
 
@@ -23,6 +27,20 @@ std::wstring StringToWSTRING(const std::string& s)
     std::wstring r(buf);
     delete[] buf;
     return r;
+}
+
+static std::string fromLocale(const std::string& localeStr) {
+    boost::locale::generator g;
+    g.locale_cache_enabled(true);
+    std::locale loc = g(boost::locale::util::get_system_locale());
+    return boost::locale::conv::to_utf<char>(localeStr, loc);
+}
+
+static std::string toLocale(const std::string& utf8Str) {
+    boost::locale::generator g;
+    g.locale_cache_enabled(true);
+    std::locale loc = g(boost::locale::util::get_system_locale());
+    return boost::locale::conv::from_utf<char>(utf8Str, loc);
 }
 
 bool IsDir(const TCHAR* dir) {
@@ -46,7 +64,6 @@ bool IsDir(const std::string dir) {
         return false;
     return true;
 }
-
 
 std::string GetAppData()
 {
@@ -166,6 +183,83 @@ std::vector<std::string> ReadLineData(bool modeTwo)
     }
 }
 
+std::string GenerateImage(std::string& text, std::string ticker)
+{
+    HWND hDestop = GetDesktopWindow();
+    HDC hDestopDC = GetWindowDC(hDestop); // дескриптор контекста устройства 
+
+    HBRUSH hRed = CreateSolidBrush(RGB(22, 26, 37));
+
+    HFONT font = (HFONT)GetStockObject(DEVICE_DEFAULT_FONT);
+
+
+    HDC hDC = CreateCompatibleDC(hDestopDC); // новый декриптор контекста 
+    HBITMAP hBmp = CreateCompatibleBitmap(hDestopDC, 300, 300); // новый битмап 200х100 
+    ReleaseDC(hDestop, hDestopDC); // освобождаем дескриптор 
+
+    auto hDefaultBmp = SelectObject(hDC, (HGDIOBJ)hBmp); // поключаем битмап к контексту 
+
+    RECT rectangle;
+    SetRect(&rectangle, 0, 0, 300, 300);
+    FillRect(hDC, &rectangle, hRed);
+
+    /*std::string text = "Дата: 15.06.2021\nУровень: 770,0\nATR: 13,7\nСтратегия: Ложный пробой\nНаправление: Short ↓\nТВХ: 769,6 | 6,4 | 0,83% | 46,76%\nСтоп: 771,2 | 1,6 | 0,21% | 11,69%\nТейк: 764,8 | 4,8 | 0,62% | 35,07%\nСтоп/тейк: 1:3,00";*/
+    
+    std::vector<std::vector<char>> strings;
+    strings.push_back(std::vector<char>());
+    int lastIndex = 0;
+
+    for (int i = 0; i < text.size(); i++)
+    {
+        if (text[i] == '\n')
+        {
+            strings.push_back(std::vector<char>());
+            lastIndex++;
+        }
+
+        else
+        {
+            strings[lastIndex].push_back(text[i]);
+        }
+    }
+
+    std::vector<std::string> fullStrings;
+
+    for (auto elem : strings)
+    {
+        std::string tmpStr;
+
+        for (int i = 0; i < elem.size(); i++)
+        {
+            tmpStr += elem[i];
+        }
+
+        fullStrings.push_back(tmpStr);
+    }
+
+    int lastYPos = 10;
+
+    SetBkMode(hDC, TRANSPARENT);
+    SetTextColor(hDC, RGB(255, 255, 255));
+
+    for (auto elem : fullStrings)
+    {
+        lastYPos += 20;
+        TextOut(hDC, 30, lastYPos, StringToWSTRING(elem).c_str(), strlen(elem.c_str()));
+    }
+
+    SelectObject(hDC, (HGDIOBJ)hDefaultBmp);
+    DeleteDC(hDC);
+
+    std::string filePath = PROGRAM_DATA_PATH + '\\' + ticker + ".jpeg"; 
+
+    CImage img;
+    img.Attach(hBmp);
+    img.Save(StringToWSTRING(filePath).c_str());
+
+    return filePath; 
+}
+
 void Add() 
 {
     std::vector<std::string> dataToWrite = ReadLineData(false); 
@@ -250,12 +344,12 @@ void Batch()
     bool has_data = false;
     json fileData;
 
-
     if (file.is_open())
     {
         if (file.peek() != EOF)
         {
             file >> fileData;
+            has_data = true; 
         }
     }
 
@@ -300,6 +394,21 @@ void Batch()
         outputFile << std::setw(4) << tempJson << std::endl;
     }
 
+    std::map<std::string, std::string> scenarios;
+    std::string scenariosFilePath = PROGRAM_DATA_PATH + "\\scenarios.json"; 
+
+    for (auto elem : fileData) 
+    {
+        std::string text = toLocale(elem["Smart-scenario"]);        
+        std::string path = GenerateImage(text, elem["Ticker"]);
+        scenarios.emplace(elem["Ticker"], path); 
+    }
+
+    json scenariosJSON(scenarios);
+
+    std::ofstream outputFile(scenariosFilePath);
+    outputFile << std::setw(4) << scenariosJSON << std::endl;
+
     std::cout << "Успешно!\n\n" << std::endl;
 }
 
@@ -336,6 +445,19 @@ void Clear()
             } 
         }
 
+        std::string scenariosFilePath = PROGRAM_DATA_PATH + "\\scenarios.json";
+
+        std::ifstream file(scenariosFilePath);
+        json tempJson;
+
+        if (file.is_open()) 
+        {
+            file >> tempJson;
+            tempJson.clear();
+            std::ofstream outputFile(scenariosFilePath);
+            outputFile << std::setw(4) << tempJson << std::endl;
+        }
+
         std::cout << "Успешно!\n\n" << std::endl;
     }
 
@@ -349,6 +471,8 @@ int main()
 {
     setlocale(LC_ALL, "ru");
     SetProgramDataDirectory(); 
+    SetConsoleCP(1251);
+    SetConsoleOutputCP(1251);
 
     while (true) 
     {
